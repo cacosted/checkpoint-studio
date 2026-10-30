@@ -1,0 +1,13 @@
+{
+  "name": "pokemon-checkpoint-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs"
+  },
+  "devDependencies": {
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.4.299"
+  }
+}

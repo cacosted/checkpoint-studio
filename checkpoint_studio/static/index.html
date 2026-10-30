@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101115">
+  <title>Checkpoint Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Checkpoint Studio">
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><rect x="3" y="3" width="30" height="30" rx="9" fill="currentColor"/><path d="M10 13h16M10 18h10M10 23h13" stroke="#101115" stroke-width="3" stroke-linecap="round"/><circle cx="25" cy="23" r="3" fill="#101115"/></svg>
+      <span>Checkpoint <strong>Studio</strong></span>
+    </a>
+    <div class="file-context" id="file-context" hidden>
+      <span class="file-dot"></span>
+      <span id="file-name"></span>
+      <span class="saved-label">Guardado local</span>
+    </div>
+    <div class="top-actions">
+      <button class="button button-ghost" id="open-button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5"/></svg>
+        Nuevo PDF
+      </button>
+      <button class="button button-primary" id="export-button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
+        Exportar todo
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="empty-state" id="empty-state">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> TU FLUJO, EN UN SOLO LUGAR</div>
+        <h1>Del guion al equipo.<br><em>Sin pasos manuales.</em></h1>
+        <p>Importa tu PDF de Notion, revisa los eventos y obtén todos los checkpoints con sus plantillas listas para editar.</p>
+        <div class="feature-row">
+          <span>Reglas deterministas</span><i></i><span>Historial completo</span><i></i><span>PNG + SVG</span>
+        </div>
+      </div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Seleccionar guion PDF">
+        <div class="dropzone-orbit">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 22V6m0 0-6 6m6-6 6 6M6 20v6h20v-6"/></svg>
+        </div>
+        <h2>Suelta tu guion aquí</h2>
+        <p>o haz clic para elegir un PDF de Notion</p>
+        <span class="dropzone-button">Seleccionar PDF</span>
+        <small>Procesamiento local · Máximo 40 MB</small>
+      </div>
+      <div class="color-legend">
+        <span><b class="dot green"></b>Captura</span>
+        <span><b class="dot red"></b>Baja permanente</span>
+        <span><b class="dot purple"></b>Evolución</span>
+        <span><b class="dot blue"></b>Checkpoint</span>
+      </div>
+    </section>
+
+    <section class="workspace" id="workspace" hidden>
+      <div class="summary-bar">
+        <div class="summary-project"><span class="summary-label">PROYECTO</span><strong id="project-title"></strong></div>
+        <div class="summary-stat"><strong id="stat-checkpoints">0</strong><span>Checkpoints</span></div>
+        <div class="summary-stat"><strong id="stat-captures">0</strong><span>Capturas</span></div>
+        <div class="summary-stat"><strong id="stat-deaths">0</strong><span>Bajas</span></div>
+        <div class="summary-stat"><strong id="stat-evolutions">0</strong><span>Evoluciones</span></div>
+        <button class="review-pill" id="review-button"><span class="review-dot"></span><strong id="stat-review">0</strong> por revisar<svg viewBox="0 0 20 20"><path d="m7 4 6 6-6 6"/></svg></button>
+      </div>
+
+      <div class="workspace-grid">
+        <aside class="checkpoint-panel">
+          <div class="panel-heading"><div><span class="section-kicker">LÍNEA TEMPORAL</span><h2>Checkpoints</h2></div><span class="count-badge" id="checkpoint-count">0</span></div>
+          <div class="checkpoint-list" id="checkpoint-list"></div>
+          <div class="sidebar-note"><svg viewBox="0 0 20 20"><path d="M10 9v5m0-8v1m0 9a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/></svg>El orden de captura se conserva en cada imagen.</div>
+        </aside>
+
+        <section class="stage-panel">
+          <div class="stage-heading">
+            <div><span class="section-kicker" id="preview-kicker">PLANTILLA 01</span><h2 id="preview-title">Checkpoint 1</h2></div>
+            <div class="stage-actions"><span class="format-badge">1920 × 1080</span><button class="icon-button" id="download-svg" title="Descargar SVG"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg><span>SVG</span></button><button class="icon-button" id="download-png" title="Descargar PNG"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg><span>PNG</span></button></div>
+          </div>
+          <div class="preview-shell" id="preview-shell"><div class="template-preview" id="template-preview"></div></div>
+          <div class="preview-caption"><span><i class="live-dot"></i>Vista previa de la plantilla</span><span id="preview-roster-count">0 integrantes</span></div>
+
+          <div class="detail-panel">
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="text" role="tab">Registro de texto</button>
+              <button class="tab" data-tab="events" role="tab">Eventos <span id="events-tab-count"></span></button>
+              <button class="tab" data-tab="design" role="tab">Diseño</button>
+              <div class="tab-spacer"></div>
+              <button class="text-action" id="copy-text"><svg viewBox="0 0 20 20"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M13 6V4H4v9h2"/></svg>Copiar</button>
+              <button class="text-action" id="download-text"><svg viewBox="0 0 20 20"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 17h12"/></svg>TXT</button>
+            </div>
+            <div class="tab-content" id="tab-text"><pre id="text-output"></pre></div>
+            <div class="tab-content events-content" id="tab-events" hidden>
+              <div class="events-toolbar"><div class="filter-group"><button class="filter active" data-filter="all">Todos</button><button class="filter" data-filter="review">Por revisar</button></div><button class="small-button" id="add-event">+ Añadir evento</button></div>
+              <div class="event-list" id="event-list"></div>
+            </div>
+            <div class="tab-content design-content" id="tab-design" hidden>
+              <div class="design-grid">
+                <label class="field"><span>Fondo</span><select id="setting-background"><option value="dark">Oscuro</option><option value="transparent">Transparente</option><option value="light">Claro</option></select></label>
+                <label class="field"><span>Columnas</span><select id="setting-columns"><option value="auto">Automáticas</option><option value="1">Una columna</option><option value="2">Dos columnas</option></select></label>
+                <label class="toggle-field"><input type="checkbox" id="setting-sprites" checked><span class="toggle"></span><span>Incluir sprites</span></label>
+                <label class="toggle-field"><input type="checkbox" id="setting-title" checked><span class="toggle"></span><span>Mostrar encabezado</span></label>
+              </div>
+              <p class="design-note">Los SVG incluyen textos editables y sprites incrustados. El PNG transparente es ideal para superponer en video.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
+  <datalist id="pokemon-names"></datalist>
+
+  <div class="loading-overlay" id="loading" hidden><div class="loading-card"><div class="spinner"></div><h2 id="loading-title">Leyendo tu guion</h2><p id="loading-detail">Extrayendo texto, colores y eventos…</p></div></div>
+
+  <div class="modal-backdrop" id="event-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+      <div class="modal-heading"><div><span class="section-kicker">EDITOR DE EVENTO</span><h2 id="event-modal-title">Editar evento</h2></div><button class="close-button" data-close="event-modal" aria-label="Cerrar">×</button></div>
+      <div class="source-quote" id="event-source"></div>
+      <form id="event-form"><div id="event-fields"></div><label class="toggle-field enabled-field"><input type="checkbox" id="event-enabled" checked><span class="toggle"></span><span>Aplicar este evento al historial</span></label><div class="modal-actions"><button type="button" class="button button-danger" id="delete-event" hidden>Eliminar</button><div class="modal-spacer"></div><button type="button" class="button button-ghost" data-close="event-modal">Cancelar</button><button type="submit" class="button button-primary">Guardar cambios</button></div></form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="export-modal" hidden>
+    <div class="modal export-modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
+      <div class="modal-heading"><div><span class="section-kicker">PAQUETE COMPLETO</span><h2 id="export-modal-title">Exportar checkpoints</h2></div><button class="close-button" data-close="export-modal" aria-label="Cerrar">×</button></div>
+      <p class="modal-description">Recibirás una carpeta con todas las plantillas, el registro TXT y un JSON para conservar el proyecto.</p>
+      <div class="export-options"><label class="export-option"><input type="radio" name="export-format" value="png" checked><span class="export-format-icon">PNG</span><span><strong>Imágenes PNG</strong><small>1920 × 1080 · listas para el editor</small></span></label><label class="export-option"><input type="radio" name="export-format" value="svg"><span class="export-format-icon">SVG</span><span><strong>Vectores SVG</strong><small>Textos y elementos editables</small></span></label></div>
+      <div class="export-includes"><span>Incluye</span><b>registro.txt</b><b>proyecto.json</b><b id="export-file-count">0 plantillas</b></div>
+      <div class="modal-actions"><span class="export-progress" id="export-progress"></span><div class="modal-spacer"></div><button type="button" class="button button-ghost" data-close="export-modal">Cancelar</button><button type="button" class="button button-primary" id="confirm-export">Descargar ZIP</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
