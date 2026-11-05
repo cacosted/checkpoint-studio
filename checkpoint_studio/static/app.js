@@ -4,9 +4,13 @@ const STORAGE_KEY = "checkpoint-studio-project-v1";
 const WEB_MODE = new URLSearchParams(location.search).has("web") || !["127.0.0.1", "localhost", "::1"].includes(location.hostname);
 const TYPE_LABELS = { capture: "Captura", death: "Baja", evolution: "Evolución", checkpoint: "Checkpoint" };
 const TYPE_COLORS = { capture: "#72c99a", death: "#e47d78", evolution: "#b38cda", checkpoint: "#75a9e8" };
+const COLOR_TAGS = { green: "captura", red: "baja", purple: "evolución", blue: "checkpoint" };
+const COLOR_NAMES = { green: "verde", red: "rojo", purple: "morado", blue: "azul" };
 
 const state = {
   filename: "",
+  source: "pdf",
+  paragraphs: [],
   events: [],
   checkpoints: [],
   selected: 0,
@@ -33,7 +37,8 @@ function normalize(value) {
 function projectName() {
   return (state.filename || "Proyecto Pokémon")
     .replace(/^[0-9a-f]{8}-[0-9a-f-]+_/i, "")
-    .replace(/\.pdf$/i, "")
+    .replace(/\.(pdf|html?|zip)$/i, "")
+    .replace(/\s+[0-9a-f]{32}$/i, "")
     .replaceAll("_", " ");
 }
 
@@ -57,7 +62,7 @@ function downloadBlob(blob, filename) {
 function persist() {
   if (!state.events.length) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename: state.filename, events: state.events, settings: state.settings }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename: state.filename, source: state.source, paragraphs: state.paragraphs, events: state.events, settings: state.settings }));
   } catch {
     showToast("No se pudo guardar localmente; exporta el JSON para conservar el proyecto.");
   }
@@ -130,6 +135,35 @@ function checkpointsText() {
   }).join("\n\n");
 }
 
+function locationLabel(number) {
+  return state.source === "html" ? `párrafo ${number}` : `página ${number}`;
+}
+
+// PDF extraction leaves a few stray colored letters in otherwise single-color
+// paragraphs (e.g. 4 "red" letters in a green capture), so minor colors are noise.
+function paragraphColors(paragraph) {
+  const colors = paragraph.colors || {};
+  const total = Object.keys(COLOR_TAGS).reduce((sum, color) => sum + (colors[color] || 0), 0);
+  return Object.keys(COLOR_TAGS).filter((color) => colors[color] && colors[color] / total >= 0.15);
+}
+
+function taggedMarkdown() {
+  const legend = Object.entries(COLOR_TAGS).map(([color, tag]) => `[${tag}]=${COLOR_NAMES[color]}`).join(", ");
+  const lines = [`# ${projectName()}`, "", `<!-- Etiquetas por color del guion: ${legend}, [apodo: X]=naranja -->`];
+  for (const paragraph of state.paragraphs) {
+    const nicknames = (paragraph.nicknames || []).map((name) => `[apodo: ${name}]`);
+    const tags = [...paragraphColors(paragraph).map((color) => `[${COLOR_TAGS[color]}]`), ...nicknames].join("");
+    const heading = paragraph.heading ? `${"#".repeat(Math.min(paragraph.heading + 1, 6))} ` : "";
+    lines.push("", `${heading}${tags ? `${tags} ` : ""}${paragraph.text}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function downloadMarkdown() {
+  if (!state.paragraphs.length) return showToast("Vuelve a importar el guion para generar el Markdown.");
+  downloadBlob(new Blob([taggedMarkdown()], { type: "text/markdown;charset=utf-8" }), `${projectName().replace(/[^a-zA-Z0-9áéíóúñ]+/gi, "-")}.md`);
+}
+
 function renderAll() {
   const hasProject = state.events.length > 0;
   $("#empty-state").hidden = hasProject;
@@ -171,7 +205,7 @@ function renderCheckpointList() {
   $("#checkpoint-list").innerHTML = state.checkpoints.map((checkpoint) => `
     <button class="checkpoint-item ${checkpoint.number - 1 === state.selected ? "active" : ""}" data-checkpoint="${checkpoint.number - 1}">
       <span class="checkpoint-number">${String(checkpoint.number).padStart(2, "0")}</span>
-      <span class="checkpoint-info"><strong>${escapeHtml(checkpoint.title)}</strong><span>${checkpoint.pokemon.length} integrantes · pág. ${checkpoint.page}</span></span>
+      <span class="checkpoint-info"><strong>${escapeHtml(checkpoint.title)}</strong><span>${checkpoint.pokemon.length} integrantes · ${locationLabel(checkpoint.page)}</span></span>
       <span class="checkpoint-arrow">›</span>
     </button>`).join("");
   $$("[data-checkpoint]").forEach((button) => button.addEventListener("click", () => {
@@ -283,7 +317,7 @@ function renderPreview() {
     $("#preview-title").textContent = "Sin checkpoints";
     return;
   }
-  $("#preview-kicker").textContent = `PLANTILLA ${String(checkpoint.number).padStart(2, "0")} · PÁGINA ${checkpoint.page}`;
+  $("#preview-kicker").textContent = `PLANTILLA ${String(checkpoint.number).padStart(2, "0")} · ${locationLabel(checkpoint.page).toUpperCase()}`;
   $("#preview-title").textContent = checkpoint.title;
   $("#preview-roster-count").textContent = `${checkpoint.pokemon.length} integrantes`;
   $("#template-preview").innerHTML = renderSvg(checkpoint);
@@ -358,7 +392,7 @@ function renderEvents() {
   $("#event-list").innerHTML = events.map((event) => `
     <button class="event-item ${event.needs_review ? "needs-review" : ""} ${event.enabled ? "" : "disabled"}" data-event="${event.id}">
       <span class="event-color" style="background:${TYPE_COLORS[event.type]}"></span>
-      <span class="event-type"><strong>${TYPE_LABELS[event.type]}</strong><span>${event.page ? `Página ${event.page}` : "Manual"}</span></span>
+      <span class="event-type"><strong>${TYPE_LABELS[event.type]}</strong><span>${event.page ? locationLabel(event.page) : "Manual"}</span></span>
       <span class="event-description">${escapeHtml(eventDescription(event))}<small>${escapeHtml(event.source)}</small></span>
       ${event.needs_review ? `<span class="event-warning" title="Revisar">⚠</span>` : ""}<span class="event-chevron">›</span>
     </button>`).join("");
@@ -501,29 +535,65 @@ function activateTab(name) {
   for (const tab of ["text", "events", "design"]) $(`#tab-${tab}`).hidden = tab !== name;
 }
 
+function fileKind(file) {
+  const extension = file.name.split(".").pop().toLowerCase();
+  if (extension === "pdf" || file.type === "application/pdf") return "pdf";
+  if (["html", "htm"].includes(extension) || file.type === "text/html") return "html";
+  if (extension === "zip" || file.type.includes("zip")) return "zip";
+  if (["md", "markdown"].includes(extension)) return "markdown";
+  return "unknown";
+}
+
+async function htmlFromZip(file) {
+  let fflate;
+  try {
+    fflate = await import("./vendor/fflate.js");
+  } catch {
+    throw new Error("No pude abrir el ZIP aquí. Descomprímelo y sube el archivo .html.");
+  }
+  const entries = Object.entries(fflate.unzipSync(new Uint8Array(await file.arrayBuffer()), { filter: (entry) => /\.html?$/i.test(entry.name) }));
+  if (!entries.length) throw new Error("El ZIP no trae ninguna página HTML. Exporta desde Notion como «HTML».");
+  const [name, content] = entries.sort((a, b) => b[1].length - a[1].length)[0];
+  return { name: name.split("/").pop(), html: fflate.strFromU8(content) };
+}
+
+async function parsePdfFile(file) {
+  if (WEB_MODE) {
+    const { parsePdf } = await import("./parser.js");
+    return parsePdf(await file.arrayBuffer(), file.name, (page, total) => {
+      $("#loading-detail").textContent = `Leyendo página ${page} de ${total} en tu navegador…`;
+    });
+  }
+  const response = await fetch("/api/parse", {
+    method: "POST",
+    headers: { "Content-Type": "application/pdf", "X-Filename": encodeURIComponent(file.name) },
+    body: file,
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "No se pudo leer el PDF.");
+  return result;
+}
+
+async function parseHtmlFile(file, kind) {
+  const { name, html } = kind === "zip" ? await htmlFromZip(file) : { name: file.name, html: await file.text() };
+  const { parseHtml } = await import("./parser.js");
+  return parseHtml(html, name);
+}
+
 async function handleFile(file) {
   if (!file) return;
-  if (file.size > 40 * 1024 * 1024) return showToast("El PDF supera el límite de 40 MB.");
+  const kind = fileKind(file);
+  if (kind === "markdown") return showToast("El Markdown de Notion no conserva los colores. Exporta la página como «HTML».");
+  if (kind === "unknown") return showToast("Sube un PDF o un HTML (o ZIP) exportado de Notion.");
+  if (file.size > 40 * 1024 * 1024) return showToast("El archivo supera el límite de 40 MB.");
   $("#loading-title").textContent = "Leyendo tu guion";
   $("#loading-detail").textContent = "Extrayendo texto, colores y eventos…";
   $("#loading").hidden = false;
   try {
-    let result;
-    if (WEB_MODE) {
-      const { parsePdf } = await import("./parser.js");
-      result = await parsePdf(await file.arrayBuffer(), file.name, (page, total) => {
-        $("#loading-detail").textContent = `Leyendo página ${page} de ${total} en tu navegador…`;
-      });
-    } else {
-      const response = await fetch("/api/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/pdf", "X-Filename": encodeURIComponent(file.name) },
-        body: file,
-      });
-      result = await response.json();
-      if (!response.ok) throw new Error(result.error || "No se pudo leer el PDF.");
-    }
+    const result = kind === "pdf" ? await parsePdfFile(file) : await parseHtmlFile(file, kind);
     state.filename = result.filename;
+    state.source = kind === "pdf" ? "pdf" : "html";
+    state.paragraphs = result.paragraphs || [];
     state.events = result.events;
     state.selected = 0;
     state.filter = "all";
@@ -531,7 +601,7 @@ async function handleFile(file) {
     warmSprites();
     showToast(`${result.summary.checkpoints} checkpoints generados. Revisa las observaciones antes de exportar.`);
   } catch (error) {
-    showToast(error.message || "No se pudo procesar el PDF.");
+    showToast(error.message || "No se pudo procesar el guion.");
   } finally {
     $("#loading").hidden = true;
     $("#file-input").value = "";
@@ -618,6 +688,7 @@ async function exportAll() {
     const payload = {
       project_name: projectName(),
       text: checkpointsText(),
+      markdown: state.paragraphs.length ? taggedMarkdown() : "",
       project: { filename: state.filename, events: state.events, checkpoints: state.checkpoints, settings: state.settings },
       files,
     };
@@ -661,7 +732,7 @@ function bindEvents() {
   });
   $("#dropzone").addEventListener("drop", (event) => handleFile(event.dataTransfer.files[0]));
   $("#open-button").addEventListener("click", () => {
-    if (confirm("Abrir otro PDF reemplazará el proyecto actual. Exporta tu trabajo si quieres conservarlo.")) $("#file-input").click();
+    if (confirm("Abrir otro guion reemplazará el proyecto actual. Exporta tu trabajo si quieres conservarlo.")) $("#file-input").click();
   });
   $$(".tab").forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tab)));
   $$(".filter").forEach((button) => button.addEventListener("click", () => {
@@ -708,6 +779,7 @@ function bindEvents() {
     }
   });
   $("#download-text").addEventListener("click", () => downloadBlob(new Blob([checkpointsText()], { type: "text/plain;charset=utf-8" }), "registro-checkpoints.txt"));
+  $("#download-markdown").addEventListener("click", downloadMarkdown);
   $("#download-svg").addEventListener("click", () => downloadCurrent("svg"));
   $("#download-png").addEventListener("click", () => downloadCurrent("png"));
   $("#export-button").addEventListener("click", () => {
@@ -736,6 +808,8 @@ async function initialize() {
     try {
       const project = JSON.parse(saved);
       state.filename = project.filename;
+      state.source = project.source || "pdf";
+      state.paragraphs = project.paragraphs || [];
       state.events = project.events || [];
       state.settings = { ...state.settings, ...project.settings };
       recalculate();

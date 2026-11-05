@@ -1,6 +1,13 @@
-import * as pdfjs from "./vendor/pdf.mjs";
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL("./vendor/pdf.worker.mjs", import.meta.url).href;
+let pdfjsPromise;
+function loadPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import("./vendor/pdf.mjs").then((pdfjs) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL("./vendor/pdf.worker.mjs", import.meta.url).href;
+      return pdfjs;
+    });
+  }
+  return pdfjsPromise;
+}
 
 const DEATH_WORDS = new Set(["cayo", "perdi", "murio", "deleteo", "deletearon", "cheto"]);
 const SPECIAL_NAMES = {
@@ -166,6 +173,11 @@ function nickname(text) {
   return null;
 }
 
+// A nickname highlighted in orange in Notion wins over the "le puse X" heuristic.
+function paragraphNickname(paragraph) {
+  return paragraph.nicknames?.at(-1) || nickname(paragraph.text);
+}
+
 function captureEvent(paragraph, index, paragraphs, position, pokedex) {
   const event = baseEvent("capture", paragraph, index);
   event.color = paragraph.colors.green ? "green" : "none";
@@ -180,13 +192,13 @@ function captureEvent(paragraph, index, paragraphs, position, pokedex) {
     fromContext = true;
     break;
   }
-  let nick = nickname(paragraph.text);
+  let nick = paragraphNickname(paragraph);
   if (!nick) {
     for (const distance of [1, 2]) {
       if (position + distance >= paragraphs.length) continue;
       const following = paragraphs[position + distance];
       if (following.colors.blue) break;
-      nick = nickname(following.text);
+      nick = paragraphNickname(following);
       if (nick) break;
     }
   }
@@ -402,6 +414,7 @@ export function parseParagraphs(paragraphs, pokedex, filename = "", pageCount = 
   return {
     filename,
     page_count: pageCount,
+    paragraphs,
     events,
     checkpoints,
     text: checkpointsText(checkpoints),
@@ -452,7 +465,7 @@ function itemColors(imageData, rect, scale) {
   return dominant[1] >= 6 ? { [dominant[0]]: dominant[1] } : {};
 }
 
-async function extractParagraphs(pdf, onProgress) {
+async function extractParagraphs(pdfjs, pdf, onProgress) {
   const paragraphs = [];
   let current = null;
   let previousPage = null;
@@ -527,7 +540,10 @@ async function extractParagraphs(pdf, onProgress) {
   return paragraphs;
 }
 
+const MISSING_CHECKPOINTS = "No encontré checkpoints azules con la palabra «team» en el guion.";
+
 export async function parsePdf(data, filename, onProgress) {
+  const pdfjs = await loadPdfjs();
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(data),
     cMapUrl: new URL("./vendor/cmaps/", import.meta.url).href,
@@ -536,9 +552,9 @@ export async function parsePdf(data, filename, onProgress) {
   });
   try {
     const pdf = await loadingTask.promise;
-    const [paragraphs, pokedex] = await Promise.all([extractParagraphs(pdf, onProgress), loadPokedex()]);
+    const [paragraphs, pokedex] = await Promise.all([extractParagraphs(pdfjs, pdf, onProgress), loadPokedex()]);
     const result = parseParagraphs(paragraphs, pokedex, filename, pdf.numPages);
-    if (!result.checkpoints.length) throw new Error("No encontré checkpoints azules con la palabra «team» en el PDF.");
+    if (!result.checkpoints.length) throw new Error(MISSING_CHECKPOINTS);
     return result;
   } catch (error) {
     if (error.name === "PasswordException") throw new Error("El PDF está protegido por contraseña.");
@@ -546,4 +562,80 @@ export async function parsePdf(data, filename, onProgress) {
   } finally {
     await loadingTask.destroy();
   }
+}
+
+// Notion's HTML export keeps text and background colors as classes such as
+// "highlight-red", "highlight-green_background" or "block-color-purple". Some
+// exports name green "teal", so both map to green. Orange marks nicknames.
+const NOTION_COLOR = /(?:^|\s)(?:highlight|block-color)-(red|green|teal|blue|purple|orange)(?:_background)?(?=\s|$)/;
+const TEXT_BLOCKS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, summary, figcaption, td, th, pre";
+
+function notionColor(element) {
+  for (let node = element; node && node.tagName !== "BODY"; node = node.parentElement) {
+    const match = (node.getAttribute("class") || "").match(NOTION_COLOR);
+    if (match) return match[1] === "teal" ? "green" : match[1];
+  }
+  return null;
+}
+
+function textBlock(element) {
+  return element.closest(TEXT_BLOCKS) || element.closest("div, figure") || element;
+}
+
+function cleanNickname(value) {
+  return value.replace(/\s+/g, " ").trim().replace(/^[.,!?;:"«»()]+|[.,!?;:"«»()]+$/g, "");
+}
+
+export function extractHtmlParagraphs(html) {
+  const document = new DOMParser().parseFromString(html, "text/html");
+  document.querySelectorAll("script, style, template, head").forEach((node) => node.remove());
+  const byBlock = new Map();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== "BR") continue;
+    const block = textBlock(element);
+    if (!byBlock.has(block)) {
+      const heading = /^H([1-6])$/.exec(block.tagName);
+      byBlock.set(block, { text: "", colors: {}, heading: heading ? Number(heading[1]) : 0, nicknames: [], inNickname: false });
+    }
+    const paragraph = byBlock.get(block);
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      paragraph.text += " ";
+      paragraph.inNickname = false;
+      continue;
+    }
+    paragraph.text += node.data;
+    const color = notionColor(element);
+    const letters = node.data.replace(/\s+/g, "").length;
+    if (color === "orange") {
+      if (paragraph.inNickname) paragraph.nicknames[paragraph.nicknames.length - 1] += node.data;
+      else paragraph.nicknames.push(node.data);
+      paragraph.inNickname = true;
+      continue;
+    }
+    if (letters) paragraph.inNickname = false;
+    if (color && letters) paragraph.colors[color] = (paragraph.colors[color] || 0) + letters;
+  }
+  const paragraphs = [];
+  for (const paragraph of byBlock.values()) {
+    const text = paragraph.text.replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    const item = { text, colors: paragraph.colors, page: paragraphs.length + 1 };
+    if (paragraph.heading) item.heading = paragraph.heading;
+    const nicknames = paragraph.nicknames.map(cleanNickname).filter(Boolean);
+    if (nicknames.length) item.nicknames = nicknames;
+    paragraphs.push(item);
+  }
+  return paragraphs;
+}
+
+export async function parseHtml(html, filename) {
+  const paragraphs = extractHtmlParagraphs(html);
+  if (!paragraphs.some((paragraph) => Object.keys(paragraph.colors).length)) {
+    throw new Error("El HTML no trae colores de Notion. Exporta la página como «HTML», no como Markdown.");
+  }
+  const result = parseParagraphs(paragraphs, await loadPokedex(), filename, 0);
+  if (!result.checkpoints.length) throw new Error(MISSING_CHECKPOINTS);
+  return result;
 }

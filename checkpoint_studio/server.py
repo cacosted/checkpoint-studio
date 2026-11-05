@@ -61,7 +61,7 @@ class StudioHandler(SimpleHTTPRequestHandler):
         filename = unquote(self.headers.get("X-Filename", "guion.pdf"))
         result = parse_pdf(body, Path(filename).name)
         if not result["checkpoints"]:
-            raise ValueError("No encontré checkpoints azules con la palabra «team» en el PDF.")
+            raise ValueError("No encontré checkpoints azules con la palabra «team» en el guion.")
         self._json(result)
 
     def _export(self):
@@ -71,6 +71,8 @@ class StudioHandler(SimpleHTTPRequestHandler):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("registro.txt", payload.get("text", ""))
+            if payload.get("markdown"):
+                archive.writestr("guion.md", payload["markdown"])
             archive.writestr(
                 "proyecto.json",
                 json.dumps(payload.get("project", {}), ensure_ascii=False, indent=2),

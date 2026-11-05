@@ -21,7 +21,7 @@
     <div class="top-actions">
       <button class="button button-ghost" id="open-button" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5"/></svg>
-        Nuevo PDF
+        Nuevo guion
       </button>
       <button class="button button-primary" id="export-button" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
@@ -35,18 +35,18 @@
       <div class="hero-copy">
         <div class="eyebrow"><span></span> TU FLUJO, EN UN SOLO LUGAR</div>
         <h1>Del guion al equipo.<br><em>Sin pasos manuales.</em></h1>
-        <p>Importa tu PDF de Notion, revisa los eventos y obtén todos los checkpoints con sus plantillas listas para editar.</p>
+        <p>Importa tu guion de Notion en PDF o HTML, revisa los eventos y obtén todos los checkpoints con sus plantillas listas para editar.</p>
         <div class="feature-row">
-          <span>Reglas deterministas</span><i></i><span>Historial completo</span><i></i><span>PNG + SVG</span>
+          <span>Reglas deterministas</span><i></i><span>Historial completo</span><i></i><span>PNG + SVG + Markdown</span>
         </div>
       </div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Seleccionar guion PDF">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Seleccionar guion PDF o HTML">
         <div class="dropzone-orbit">
           <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 22V6m0 0-6 6m6-6 6 6M6 20v6h20v-6"/></svg>
         </div>
         <h2>Suelta tu guion aquí</h2>
-        <p>o haz clic para elegir un PDF de Notion</p>
-        <span class="dropzone-button">Seleccionar PDF</span>
+        <p>o haz clic para elegir el PDF o el HTML/ZIP exportado de Notion</p>
+        <span class="dropzone-button">Seleccionar archivo</span>
         <small>Procesamiento local · Máximo 40 MB</small>
       </div>
       <div class="color-legend">
@@ -90,6 +90,7 @@
               <div class="tab-spacer"></div>
               <button class="text-action" id="copy-text"><svg viewBox="0 0 20 20"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M13 6V4H4v9h2"/></svg>Copiar</button>
               <button class="text-action" id="download-text"><svg viewBox="0 0 20 20"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 17h12"/></svg>TXT</button>
+              <button class="text-action" id="download-markdown" title="Guion en Markdown con etiquetas de color, liviano para Claude"><svg viewBox="0 0 20 20"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 17h12"/></svg>MD</button>
             </div>
             <div class="tab-content" id="tab-text"><pre id="text-output"></pre></div>
             <div class="tab-content events-content" id="tab-events" hidden>
@@ -111,7 +112,7 @@
     </section>
   </main>
 
-  <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="file-input" accept="application/pdf,.pdf,text/html,.html,.htm,application/zip,.zip,.md" hidden>
   <datalist id="pokemon-names"></datalist>
 
   <div class="loading-overlay" id="loading" hidden><div class="loading-card"><div class="spinner"></div><h2 id="loading-title">Leyendo tu guion</h2><p id="loading-detail">Extrayendo texto, colores y eventos…</p></div></div>
@@ -127,9 +128,9 @@
   <div class="modal-backdrop" id="export-modal" hidden>
     <div class="modal export-modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
       <div class="modal-heading"><div><span class="section-kicker">PAQUETE COMPLETO</span><h2 id="export-modal-title">Exportar checkpoints</h2></div><button class="close-button" data-close="export-modal" aria-label="Cerrar">×</button></div>
-      <p class="modal-description">Recibirás una carpeta con todas las plantillas, el registro TXT y un JSON para conservar el proyecto.</p>
+      <p class="modal-description">Recibirás una carpeta con todas las plantillas, el registro TXT, el guion en Markdown y un JSON para conservar el proyecto.</p>
       <div class="export-options"><label class="export-option"><input type="radio" name="export-format" value="png" checked><span class="export-format-icon">PNG</span><span><strong>Imágenes PNG</strong><small>1920 × 1080 · listas para el editor</small></span></label><label class="export-option"><input type="radio" name="export-format" value="svg"><span class="export-format-icon">SVG</span><span><strong>Vectores SVG</strong><small>Textos y elementos editables</small></span></label></div>
-      <div class="export-includes"><span>Incluye</span><b>registro.txt</b><b>proyecto.json</b><b id="export-file-count">0 plantillas</b></div>
+      <div class="export-includes"><span>Incluye</span><b>registro.txt</b><b>guion.md</b><b>proyecto.json</b><b id="export-file-count">0 plantillas</b></div>
       <div class="modal-actions"><span class="export-progress" id="export-progress"></span><div class="modal-spacer"></div><button type="button" class="button button-ghost" data-close="export-modal">Cancelar</button><button type="button" class="button button-primary" id="confirm-export">Descargar ZIP</button></div>
     </div>
   </div>

@@ -425,6 +425,7 @@ def parse_pdf(pdf_bytes: bytes, filename: str) -> dict:
     return {
         "filename": filename,
         "page_count": page_count,
+        "paragraphs": paragraphs,
         "events": events,
         "checkpoints": checkpoints,
         "text": checkpoints_text(checkpoints),
