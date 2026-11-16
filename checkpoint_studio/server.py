@@ -71,6 +71,7 @@ class StudioHandler(SimpleHTTPRequestHandler):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("registro.txt", payload.get("text", ""))
+            archive.writestr("registro.pdf", base64.b64decode(payload["pdf"]))
             if payload.get("markdown"):
                 archive.writestr("guion.md", payload["markdown"])
             archive.writestr(

@@ -5,9 +5,10 @@ function binary(content) {
   return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
 }
 
-export function createZip({ text, markdown, project, files }) {
+export function createZip({ text, pdf, markdown, project, files }) {
   const entries = {
     "registro.txt": strToU8(text),
+    "registro.pdf": binary(pdf),
     "proyecto.json": strToU8(JSON.stringify(project, null, 2)),
   };
   if (markdown) entries["guion.md"] = strToU8(markdown);

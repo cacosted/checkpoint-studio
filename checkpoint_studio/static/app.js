@@ -685,9 +685,11 @@ async function exportAll() {
       else files.push({ name, content: await blobToBase64(await svgToPng(svg)), encoding: "base64" });
     }
     $("#export-progress").textContent = "Creando ZIP…";
+    const { createRegistroPdf } = await import("./registro-pdf.js");
     const payload = {
       project_name: projectName(),
       text: checkpointsText(),
+      pdf: await blobToBase64(await createRegistroPdf({ title: projectName(), checkpoints: state.checkpoints })),
       markdown: state.paragraphs.length ? taggedMarkdown() : "",
       project: { filename: state.filename, events: state.events, checkpoints: state.checkpoints, settings: state.settings },
       files,
