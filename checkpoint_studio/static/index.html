@@ -21,7 +21,7 @@
     <div class="top-actions">
       <button class="button button-ghost" id="open-button" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5"/></svg>
-        Nuevo PDF
+        Otro guion
       </button>
       <button class="button button-primary" id="export-button" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
@@ -35,18 +35,18 @@
       <div class="hero-copy">
         <div class="eyebrow"><span></span> TU FLUJO, EN UN SOLO LUGAR</div>
         <h1>Del guion al equipo.<br><em>Sin pasos manuales.</em></h1>
-        <p>Importa tu PDF de Notion, revisa los eventos y obtén todos los checkpoints con sus plantillas listas para editar.</p>
+        <p>Importa tu guion (PDF de Notion o .md de Guion Studio), revisa los eventos y obtén todos los checkpoints con sus plantillas listas para editar.</p>
         <div class="feature-row">
           <span>Reglas deterministas</span><i></i><span>Historial completo</span><i></i><span>PNG + SVG</span>
         </div>
       </div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Seleccionar guion PDF">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Seleccionar guion (PDF o .md)">
         <div class="dropzone-orbit">
           <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 22V6m0 0-6 6m6-6 6 6M6 20v6h20v-6"/></svg>
         </div>
         <h2>Suelta tu guion aquí</h2>
-        <p>o haz clic para elegir un PDF de Notion</p>
-        <span class="dropzone-button">Seleccionar PDF</span>
+        <p>o haz clic para elegir un PDF de Notion o un .md de Guion Studio</p>
+        <span class="dropzone-button">Seleccionar guion</span>
         <small>Procesamiento local · Máximo 40 MB</small>
       </div>
       <div class="color-legend">
@@ -111,7 +111,7 @@
     </section>
   </main>
 
-  <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="file-input" accept="application/pdf,.pdf,.md,.markdown,text/markdown" hidden>
   <datalist id="pokemon-names"></datalist>
 
   <div class="loading-overlay" id="loading" hidden><div class="loading-card"><div class="spinner"></div><h2 id="loading-title">Leyendo tu guion</h2><p id="loading-detail">Extrayendo texto, colores y eventos…</p></div></div>

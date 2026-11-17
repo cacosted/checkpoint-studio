@@ -33,8 +33,13 @@ function normalize(value) {
 function projectName() {
   return (state.filename || "Proyecto Pokémon")
     .replace(/^[0-9a-f]{8}-[0-9a-f-]+_/i, "")
-    .replace(/\.pdf$/i, "")
+    .replace(/\.(pdf|md|markdown)$/i, "")
     .replaceAll("_", " ");
+}
+
+function whereLabel(item, short = false) {
+  if (item.section) return item.section;
+  return short ? `pág. ${item.page}` : `Página ${item.page}`;
 }
 
 function showToast(message) {
@@ -99,6 +104,7 @@ function recalculate(render = true) {
         number: checkpoints.length + 1,
         title: event.title || `Team ${checkpoints.length + 1}`,
         page: event.page,
+        section: event.section || "",
         event_id: event.id,
         pokemon: roster.map((member) => ({
           ...member,
@@ -171,7 +177,7 @@ function renderCheckpointList() {
   $("#checkpoint-list").innerHTML = state.checkpoints.map((checkpoint) => `
     <button class="checkpoint-item ${checkpoint.number - 1 === state.selected ? "active" : ""}" data-checkpoint="${checkpoint.number - 1}">
       <span class="checkpoint-number">${String(checkpoint.number).padStart(2, "0")}</span>
-      <span class="checkpoint-info"><strong>${escapeHtml(checkpoint.title)}</strong><span>${checkpoint.pokemon.length} integrantes · pág. ${checkpoint.page}</span></span>
+      <span class="checkpoint-info"><strong>${escapeHtml(checkpoint.title)}</strong><span>${checkpoint.pokemon.length} integrantes · ${escapeHtml(whereLabel(checkpoint, true))}</span></span>
       <span class="checkpoint-arrow">›</span>
     </button>`).join("");
   $$("[data-checkpoint]").forEach((button) => button.addEventListener("click", () => {
@@ -283,7 +289,7 @@ function renderPreview() {
     $("#preview-title").textContent = "Sin checkpoints";
     return;
   }
-  $("#preview-kicker").textContent = `PLANTILLA ${String(checkpoint.number).padStart(2, "0")} · PÁGINA ${checkpoint.page}`;
+  $("#preview-kicker").textContent = `PLANTILLA ${String(checkpoint.number).padStart(2, "0")} · ${whereLabel(checkpoint).toUpperCase()}`;
   $("#preview-title").textContent = checkpoint.title;
   $("#preview-roster-count").textContent = `${checkpoint.pokemon.length} integrantes`;
   $("#template-preview").innerHTML = renderSvg(checkpoint);
@@ -358,7 +364,7 @@ function renderEvents() {
   $("#event-list").innerHTML = events.map((event) => `
     <button class="event-item ${event.needs_review ? "needs-review" : ""} ${event.enabled ? "" : "disabled"}" data-event="${event.id}">
       <span class="event-color" style="background:${TYPE_COLORS[event.type]}"></span>
-      <span class="event-type"><strong>${TYPE_LABELS[event.type]}</strong><span>${event.page ? `Página ${event.page}` : "Manual"}</span></span>
+      <span class="event-type"><strong>${TYPE_LABELS[event.type]}</strong><span>${escapeHtml(event.page || event.section ? whereLabel(event) : "Manual")}</span></span>
       <span class="event-description">${escapeHtml(eventDescription(event))}<small>${escapeHtml(event.source)}</small></span>
       ${event.needs_review ? `<span class="event-warning" title="Revisar">⚠</span>` : ""}<span class="event-chevron">›</span>
     </button>`).join("");
@@ -501,8 +507,35 @@ function activateTab(name) {
   for (const tab of ["text", "events", "design"]) $(`#tab-${tab}`).hidden = tab !== name;
 }
 
+function loadResult(result) {
+  state.filename = result.filename;
+  state.events = result.events;
+  state.selected = 0;
+  state.filter = "all";
+  recalculate();
+  warmSprites();
+  showToast(`${result.summary.checkpoints} checkpoints generados. Revisa las observaciones antes de exportar.`);
+}
+
+// Guion de Guion Studio (.md): los colores vienen en el texto, no hace falta leer el PDF.
+async function handleMarkdown(markdown, filename) {
+  $("#loading-title").textContent = "Leyendo tu guion";
+  $("#loading-detail").textContent = "Leyendo colores y eventos del guion…";
+  $("#loading").hidden = false;
+  try {
+    const { parseGuionMarkdown } = await import("./guion-md.js");
+    loadResult(await parseGuionMarkdown(markdown, filename));
+  } catch (error) {
+    showToast(error.message || "No se pudo leer el guion.");
+  } finally {
+    $("#loading").hidden = true;
+    $("#file-input").value = "";
+  }
+}
+
 async function handleFile(file) {
   if (!file) return;
+  if (/\.(md|markdown)$/i.test(file.name)) return handleMarkdown(await file.text(), file.name);
   if (file.size > 40 * 1024 * 1024) return showToast("El PDF supera el límite de 40 MB.");
   $("#loading-title").textContent = "Leyendo tu guion";
   $("#loading-detail").textContent = "Extrayendo texto, colores y eventos…";
@@ -523,13 +556,7 @@ async function handleFile(file) {
       result = await response.json();
       if (!response.ok) throw new Error(result.error || "No se pudo leer el PDF.");
     }
-    state.filename = result.filename;
-    state.events = result.events;
-    state.selected = 0;
-    state.filter = "all";
-    recalculate();
-    warmSprites();
-    showToast(`${result.summary.checkpoints} checkpoints generados. Revisa las observaciones antes de exportar.`);
+    loadResult(result);
   } catch (error) {
     showToast(error.message || "No se pudo procesar el PDF.");
   } finally {
@@ -661,7 +688,7 @@ function bindEvents() {
   });
   $("#dropzone").addEventListener("drop", (event) => handleFile(event.dataTransfer.files[0]));
   $("#open-button").addEventListener("click", () => {
-    if (confirm("Abrir otro PDF reemplazará el proyecto actual. Exporta tu trabajo si quieres conservarlo.")) $("#file-input").click();
+    if (confirm("Abrir otro guion reemplazará el proyecto actual. Exporta tu trabajo si quieres conservarlo.")) $("#file-input").click();
   });
   $$(".tab").forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tab)));
   $$(".filter").forEach((button) => button.addEventListener("click", () => {
@@ -722,8 +749,31 @@ function bindEvents() {
   });
 }
 
+// Guion Studio abre esta página con el guion comprimido en el fragmento:
+//   #guion=<deflate-raw en base64url>&nombre=<archivo.md>
+// El fragmento nunca llega al servidor; se borra de la barra de direcciones al leerlo.
+async function loadFromFragment() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const payload = params.get("guion");
+  if (!payload) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  const filename = params.get("nombre") || "guion.md";
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    const markdown = await new Response(stream).text();
+    if (state.events.length && !confirm(`¿Reemplazar el proyecto actual con «${filename.replace(/\.md$/i, "")}»?`)) return true;
+    await handleMarkdown(markdown, filename);
+  } catch {
+    showToast("No pude leer el guion que mandó Guion Studio. Arrastra el .md aquí.");
+  }
+  return true;
+}
+
 async function initialize() {
   bindEvents();
+  window.addEventListener("hashchange", loadFromFragment);
   const response = await fetch("./data/pokemon.json");
   const entries = await response.json();
   state.pokedex = entries.map((entry) => ({
@@ -746,6 +796,7 @@ async function initialize() {
   } else {
     renderAll();
   }
+  await loadFromFragment();
 }
 
 initialize();
