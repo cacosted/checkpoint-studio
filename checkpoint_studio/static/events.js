@@ -1,5 +1,5 @@
 // Reglas para detectar capturas, bajas, evoluciones y checkpoints a partir de párrafos con colores.
-// Las comparten el lector de PDF (parser.js) y el de guiones Markdown de Guion Studio (guion-md.js).
+// Las comparten el lector de PDF (parser.js) y el de guiones Markdown de Cacoscript (guion-md.js).
 
 const DEATH_WORDS = new Set(["cayo", "perdi", "murio", "deleteo", "deletearon", "cheto"]);
 const SPECIAL_NAMES = {

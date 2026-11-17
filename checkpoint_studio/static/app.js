@@ -517,7 +517,7 @@ function loadResult(result) {
   showToast(`${result.summary.checkpoints} checkpoints generados. Revisa las observaciones antes de exportar.`);
 }
 
-// Guion de Guion Studio (.md): los colores vienen en el texto, no hace falta leer el PDF.
+// Guion de Cacoscript (.md): los colores vienen en el texto, no hace falta leer el PDF.
 async function handleMarkdown(markdown, filename) {
   $("#loading-title").textContent = "Leyendo tu guion";
   $("#loading-detail").textContent = "Leyendo colores y eventos del guion…";
@@ -749,7 +749,7 @@ function bindEvents() {
   });
 }
 
-// Guion Studio abre esta página con el guion comprimido en el fragmento:
+// Cacoscript abre esta página con el guion comprimido en el fragmento:
 //   #guion=<deflate-raw en base64url>&nombre=<archivo.md>
 // El fragmento nunca llega al servidor; se borra de la barra de direcciones al leerlo.
 async function loadFromFragment() {
@@ -766,7 +766,7 @@ async function loadFromFragment() {
     if (state.events.length && !confirm(`¿Reemplazar el proyecto actual con «${filename.replace(/\.md$/i, "")}»?`)) return true;
     await handleMarkdown(markdown, filename);
   } catch {
-    showToast("No pude leer el guion que mandó Guion Studio. Arrastra el .md aquí.");
+    showToast("No pude leer el guion que mandó Cacoscript. Arrastra el .md aquí.");
   }
   return true;
 }

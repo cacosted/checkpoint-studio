@@ -1,4 +1,4 @@
-// Lee guiones de Guion Studio (.md con colores) sin pasar por el PDF.
+// Lee guiones de Cacoscript (.md con colores) sin pasar por el PDF.
 // Los colores vienen escritos en el archivo, así que no hay que adivinarlos por píxeles:
 //   1. <span data-color="green">Lo atrapé y le puse Furia.</span>
 import { loadPokedex, parseParagraphs } from "./events.js";
